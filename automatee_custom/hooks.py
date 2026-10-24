@@ -247,3 +247,29 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+# Customizations as code
+# ----------------------
+# Everything tagged with the "Automatee Custom" module is kept in this app and
+# re-imported on every `bench migrate`. See automatee_custom/sync.py.
+
+CUSTOMIZATION_MODULE = "Automatee Custom"
+
+# Customization records that live in the database but have a module field.
+TRACKED_DOCTYPES = ["Custom Field", "Property Setter", "Client Script", "Server Script"]
+
+fixtures = [{"dt": dt, "filters": [["module", "=", CUSTOMIZATION_MODULE]]} for dt in TRACKED_DOCTYPES]
+
+doc_events = {
+	**{
+		dt: {
+			"before_insert": "automatee_custom.sync.claim_for_app",
+			"on_update": "automatee_custom.sync.queue_export",
+			"after_delete": "automatee_custom.sync.record_deletion",
+		}
+		for dt in TRACKED_DOCTYPES
+	},
+	"DocType": {"before_insert": "automatee_custom.sync.make_doctype_standard"},
+}
+
+after_migrate = ["automatee_custom.sync.apply_deletions"]
