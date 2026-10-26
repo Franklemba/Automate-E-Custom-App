@@ -1,1 +1,40 @@
-[]
+[
+ {
+  "allow_guest": 0,
+  "api_method": "validate_debt_ratio",
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Insert",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2026-10-26 10:48:08.229923",
+  "module": "Automatee Custom",
+  "name": "validate_debt_ratio",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": null,
+  "script": "# =========================\n# Unified Payroll Formula Engine (Frappe Server Script Safe)\n# =========================\n\ndef evaluate_formula(formula_text, variables, fallback_amount):\n    try:\n\n        formula_text = (formula_text or \"\").strip()\n\n        # -------------------------\n        # SIMPLE EXPRESSION (no IF)\n        # -------------------------\n        if ' if ' not in formula_text:\n\n            if '*' in formula_text:\n                parts = formula_text.split('*')\n\n                left_val = variables.get(parts[0].strip(), frappe.utils.flt(parts[0].strip()))\n                right_val = variables.get(parts[1].strip(), frappe.utils.flt(parts[1].strip()))\n\n                if isinstance(left_val, str):\n                    left_val = frappe.utils.flt(left_val)\n                if isinstance(right_val, str):\n                    right_val = frappe.utils.flt(right_val)\n\n                return left_val * right_val\n\n            return frappe.utils.flt(variables.get(formula_text, formula_text))\n\n        # -------------------------\n        # IF CONDITION PARSER\n        # -------------------------\n        remaining_expr = formula_text\n        resolved_flag = False\n\n        while ' if ' in remaining_expr and not resolved_flag:\n\n            if_position = remaining_expr.find(' if ')\n            value_expr = remaining_expr[:if_position].strip()\n\n            after_if = remaining_expr[if_position + 4:]\n            else_position = after_if.find(' else ')\n\n            condition_expr = after_if[:else_position].strip()\n            else_expr = after_if[else_position + 6:].strip()\n\n            condition_met = False\n\n            # -------------------------\n            # IN CONDITION\n            # -------------------------\n            if ' in ' in condition_expr and '[' in condition_expr:\n\n                var_name = condition_expr.split(' in ')[0].strip()\n                list_raw = condition_expr.split(' in ')[1].strip()\n\n                var_value = variables.get(var_name, var_name)\n\n                items = list_raw.strip('[]').split(',')\n                items = [i.strip().strip('\"').strip(\"'\") for i in items]\n\n                condition_met = (var_value in items)\n\n            # -------------------------\n            # EQUALITY CONDITION\n            # -------------------------\n            elif '==' in condition_expr:\n\n                parts = condition_expr.split('==')\n\n                left_side = parts[0].strip().strip('\"').strip(\"'\")\n                right_side = parts[1].strip().strip('\"').strip(\"'\")\n\n                left_side = variables.get(left_side, left_side)\n\n                condition_met = (str(left_side) == str(right_side))\n\n            # -------------------------\n            # IF TRUE\n            # -------------------------\n            if condition_met:\n\n                if '*' in value_expr:\n                    vp = value_expr.split('*')\n\n                    vl = variables.get(vp[0].strip(), frappe.utils.flt(vp[0].strip()))\n                    vr = variables.get(vp[1].strip(), frappe.utils.flt(vp[1].strip()))\n\n                    if isinstance(vl, str):\n                        vl = frappe.utils.flt(vl)\n                    if isinstance(vr, str):\n                        vr = frappe.utils.flt(vr)\n\n                    return vl * vr\n\n                return frappe.utils.flt(variables.get(value_expr, value_expr))\n\n            # continue else chain\n            remaining_expr = else_expr\n\n        # -------------------------\n        # FINAL FALLBACK\n        # -------------------------\n        if '*' in remaining_expr:\n            parts = remaining_expr.split('*')\n\n            left_val = variables.get(parts[0].strip(), frappe.utils.flt(parts[0].strip()))\n            right_val = variables.get(parts[1].strip(), frappe.utils.flt(parts[1].strip()))\n\n            if isinstance(left_val, str):\n                left_val = frappe.utils.flt(left_val)\n            if isinstance(right_val, str):\n                right_val = frappe.utils.flt(right_val)\n\n            return left_val * right_val\n\n        return frappe.utils.flt(variables.get(remaining_expr.strip(), remaining_expr.strip()))\n\n    except Exception:\n        return fallback_amount\n\n\n# =========================\n# MAIN EXECUTION (EARNINGS + DEDUCTIONS)\n# =========================\n\nvariables = {\n    \"base\": base_salary,\n    \"gross_pay\": gross_pay,\n    \"grade\": employee_grade\n}\n\n# -------------------------\n# EARNINGS\n# -------------------------\nfor e in earnings:\n    e.amount = evaluate_formula(\n        e.formula,\n        variables,\n        frappe.utils.flt(e.amount or 0)\n    )\n\n# update gross pay\ngross_pay = sum([frappe.utils.flt(e.amount) for e in earnings])\nvariables[\"gross_pay\"] = gross_pay\n\n\n# -------------------------\n# DEDUCTIONS\n# -------------------------\nfor d in deductions:\n    d.amount = evaluate_formula(\n        d.formula,\n        variables,\n        frappe.utils.flt(d.amount or 0)\n    )",
+  "script_type": "API"
+ },
+ {
+  "allow_guest": 0,
+  "api_method": null,
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Save",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2026-10-26 11:01:03.830877",
+  "module": "Automatee Custom",
+  "name": "Site Visit Won Needs Notes",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": "Site Visit",
+  "script": "if doc.outcome == 'Won' and not doc.notes:\n    frappe.throw('Add notes describing what was won.')\n",
+  "script_type": "DocType Event"
+ }
+]
